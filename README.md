@@ -6,7 +6,7 @@ This script automates the process of matching expense receipts (images, PDFs, an
 
 Install the required packages,
 
-NOTE: You must already have a master list built by Excel with a item amount in a column (C in this case, an indicator if the receipt exists or not with mark "Y" (Column K) for yes "N" for no. 
+NOTE: You must already have a master list built by Excel with a item amount in a column (C in this case, an indicator if the receipt exists or not with an indicator "Y" (Column K) for yes "N" for no reciepts. 
 
 How It Works
 
