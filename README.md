@@ -2,9 +2,13 @@
 
 This script automates the process of matching expense receipts (images, PDFs, and images embedded in Excel files) with master expense reports using Optical Character Recognition (OCR). It is designed for accounting and finance departments to streamline expense verification.
 
+### Prerequisites
+
+Install the required packages,
+
 NOTE: You must already have a master list built by Excel with a item amount in a column (C in this case, an indicator if the receipt exists or not with mark "Y" (Column K) for yes "N" for no. 
 
-## 📋 How It Works
+How It Works
 
 The script automatically:
 1. **Scans** each subfolder for a master expense file (containing item amounts)
@@ -18,7 +22,7 @@ The script automatically:
 - Tracks where OCR found numbers in receipts and annotates them
 - Color-codes annotations by confidence (green = high, yellow = medium, red = low)
 
-## 🗂️ Folder Structure
+ Folder Structure
 
 Create a main folder for expense verification, then add subfolders for each project or period:
 
@@ -43,16 +47,13 @@ Invoice/order numbers (INV-12345, ORD-789)
 
 Tax IDs and reference numbers
 
-## 🚀 Getting Started
+ Getting Started
 
-### Prerequisites
-
-Install the required packages,
-
-Adjust other settings as needed (optional):
-
+Change the BASE_FOLDER path. 
 BASE_FOLDER = r"C:\Your\Path\Here"
 
+
+Adjust other settings as needed (optional):
 OCR_MIN_CONF = 0.40           # Minimum confidence for OCR (0-1)
 AMOUNT_TOLERANCE = 0.01       # Tolerance for amount matching (±$0.01)
 COMBO_MAX_LEN = 3              # Maximum number of receipts per expense
