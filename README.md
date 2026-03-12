@@ -35,7 +35,7 @@ Master files must contain "exp", "expense", or "report" in the filename
 
 The script automatically identifies amount columns (usually "Unnamed: 2" in Excel exports)
 
-Receipt flags with "Y" trigger matching attempts
+Receipt flags with "Y" trigger matching attempts ; if marked as "N" or nothing, skips scanning process.
 
 The script filters out common noise:
 
