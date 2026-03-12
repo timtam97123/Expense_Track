@@ -22,21 +22,6 @@ The script automatically:
 
 Create a main folder for expense verification, then add subfolders for each project or period:
 
-BASE_FOLDER/
-├── FILE_1 /
-│ ├── expense_report.xlsx (master file - must contain "exp" in filename)
-│ ├── receipt_1.jpg
-│ ├── receipt_2.pdf
-│ └── statement_with_images.xlsx
-├── FILE_2/
-│ ├── master_expense.pdf (master file - PDF with tables)
-│ └── receipts/
-├── FILE_3/
-│ ├── exp_report.xlsx (master file)
-│ ├── receipt_a.png
-│ └── receipt_b.jpeg
-└── ...
-
 
 **Each subfolder MUST contain:**
 - **One master file** (Excel or PDF) with "exp", "expense", or "report" in the filename
