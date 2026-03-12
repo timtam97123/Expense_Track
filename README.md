@@ -25,7 +25,7 @@ The script automatically:
 
  Folder Structure
 
-Create a main folder for expense verification, then add subfolders for each project or period:
+Create a main folder (on your desktop) for expense verification, then add subfolders for each project or period:
 
 
 **Each subfolder MUST contain:**
