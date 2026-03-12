@@ -28,7 +28,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 # -------------------------------
 @dataclass
 class Config:
-    BASE_FOLDER: str = r"C:\Users\tim.ng\Desktop\AE"
+    BASE_FOLDER: str = r"C:\Users\Desktop\FILENAME"  # PLEASE ADJUST YOUR FILE PATH 
     MASTER_KEYWORDS: Tuple[str, ...] = ("exp", "expense", "report")
     IMAGE_EXTS: Tuple[str, ...] = (".png", ".jpg", ".jpeg", ".tiff", ".bmp")
     EXCEL_EXTS: Tuple[str, ...] = (".xlsx", ".xlsm", ".xls")
@@ -1105,4 +1105,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
