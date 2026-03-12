@@ -2,6 +2,8 @@
 
 This script automates the process of matching expense receipts (images, PDFs, and images embedded in Excel files) with master expense reports using Optical Character Recognition (OCR). It is designed for accounting and finance departments to streamline expense verification.
 
+NOTE: You must already have a master list built by Excel with a item amount in a column (C in this case, an indicator if the receipt exists or not with mark "Y" (Column K) for yes "N" for no. 
+
 ## 📋 How It Works
 
 The script automatically:
