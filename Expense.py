@@ -19,14 +19,14 @@ from pathlib import Path
 # -------------------------------
 @dataclass
 class Config:
-    BASE_FOLDER: str = r"C:\Users\Desktop\EXPENSE"   #paste your file path here.
+    BASE_FOLDER: str = r"C:\Users\tim.ng\Desktop\AE"
     MASTER_KEYWORDS: Tuple[str, ...] = ("exp", "expense", "report")
     IMAGE_EXTS: Tuple[str, ...] = (".png", ".jpg", ".jpeg")
     EXCEL_EXTS: Tuple[str, ...] = (".xlsx", ".xlsm")
     PDF_EXTS: Tuple[str, ...] = (".pdf",)
     OCR_LANGS: Tuple[str, ...] = ("ch_tra", "en")
-    OCR_MIN_CONF: float = 0.40
-    PDF_RENDER_DPI: int = 300
+    OCR_MIN_CONF: float = 0.20          # slightly lowered to catch more faint digits
+    PDF_RENDER_DPI: int = 400           # higher DPI for better OCR on PDFs
     AMOUNT_TOLERANCE: float = 0.01
     COMBO_MAX_LEN: int = 3
     CANDIDATE_AMOUNT_MIN: float = 0.1
@@ -52,6 +52,31 @@ logger = logging.getLogger(__name__)
 
 # Initialize OCR reader (once, globally)
 reader = easyocr.Reader(list(CFG.OCR_LANGS))
+
+# -------------------------------
+# ======= CURRENCY & PATTERNS =======
+# -------------------------------
+# ISO-style currency codes list (Option A)
+CURRENCY_CODES = {
+    "USD","EUR","GBP","JPY","CNY","RMB","HKD","TWD","MOP","SGD","MYR",
+    "IDR","THB","VND","PHP","AUD","NZD","CAD","CHF","SEK","NOK","DKK",
+    "MXN","BRL","ARS","CLP","COP","PEN","ZAR","NGN","KES","EGP","ILS",
+    "AED","SAR","QAR","KWD","BHD","OMR","PKR","LKR","BDT"
+}
+
+CURRENCY_PREFIX_RE = re.compile(
+    r"^(" + "|".join(CURRENCY_CODES) + r")\s*\d",
+    re.IGNORECASE
+)
+
+# Examples: H54K7, A123B4, 12A45K
+ALTERNATING_ALNUM_RE = re.compile(r"[A-Za-z]\d+[A-Za-z]|\d+[A-Za-z]\d+")
+
+# Examples: 12A345, 99H1
+EMBEDDED_LETTER_RE = re.compile(r"\d+[A-Za-z]+\d+")
+
+# Example: ABC12345 (letter prefix that is not a known currency code)
+ID_PREFIX_RE = re.compile(r"^[A-Z]{1,3}\d{3,}$")
 
 # -------------------------------
 # ======= SMALL UTILITIES =======
@@ -129,8 +154,8 @@ def looks_like_amount(val: float, text: str) -> bool:
     if val > 200000:
         return False
 
-    # If there is no decimal point AND value is large, likely an ID (e.g. 12345678)
-    if "." not in text and val > 99999:
+    # If there is no decimal point AND value is very large, likely an ID (e.g. 12345678)
+    if "." not in text and val > 20000:
         return False
 
     # Basic upper bound for typical receipts (tune as needed)
@@ -141,12 +166,30 @@ def looks_like_amount(val: float, text: str) -> bool:
 
 def extract_amounts(text: str) -> List[float]:
     """
-    Extract numeric amounts from text, with noise filtering:
-    - Ignore OCR lines that look like dates, phone numbers, order/ID lines, etc.
-    - Only keep numbers that look like realistic amounts.
+    Extract numeric amounts from text, with:
+    - noise filtering (dates, phones, etc.)
+    - rejection of alphanumeric IDs (H54K7, A123B4)
+    - acceptance of ISO-style currency codes (USD100, MYR 50)
     """
     if not text:
         return []
+
+    cleaned_text = text.replace(" ", "").upper()
+
+    # Reject obvious alphanumeric IDs like H54K7, 12A45K,
+    # unless they are currency codes followed by digits (USD100)
+    if ALTERNATING_ALNUM_RE.search(cleaned_text):
+        if not CURRENCY_PREFIX_RE.search(cleaned_text):
+            return []
+
+    if EMBEDDED_LETTER_RE.search(cleaned_text):
+        if not CURRENCY_PREFIX_RE.search(cleaned_text):
+            return []
+
+    # ABC12345 (letters+digits) but not a known currency code
+    if ID_PREFIX_RE.match(cleaned_text):
+        if not CURRENCY_PREFIX_RE.search(cleaned_text):
+            return []
 
     # If the text context looks like date/ID/phone/order/etc, ignore entirely
     if is_noise_context(text):
@@ -285,7 +328,17 @@ def process_image(filepath: str, filename: str, page: str = "Image") -> List[lis
         logger.warning(f"Failed to load image: {filepath}")
         return []
 
+    # Basic preprocessing for thermal receipts
     np_img = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
+    gray = cv2.cvtColor(np_img, cv2.COLOR_RGB2GRAY)
+    gray = cv2.fastNlMeansDenoising(gray, h=10)
+    th = cv2.adaptiveThreshold(
+        gray, 255,
+        cv2.ADAPTIVE_THRESH_MEAN_C,
+        cv2.THRESH_BINARY,
+        31, 10
+    )
+    np_img = cv2.cvtColor(th, cv2.COLOR_GRAY2RGB)
 
     try:
         results = reader.readtext(np_img)
@@ -304,6 +357,17 @@ def process_pdf(filepath: str, filename: str) -> List[list]:
             for page_num, page in enumerate(pdf.pages, start=1):
                 pil_image = page.to_image(resolution=CFG.PDF_RENDER_DPI).original
                 np_image = np.array(pil_image)
+
+                gray = cv2.cvtColor(np_image, cv2.COLOR_RGB2GRAY)
+                gray = cv2.fastNlMeansDenoising(gray, h=10)
+                th = cv2.adaptiveThreshold(
+                    gray, 255,
+                    cv2.ADAPTIVE_THRESH_MEAN_C,
+                    cv2.THRESH_BINARY,
+                    31, 10
+                )
+                np_image = cv2.cvtColor(th, cv2.COLOR_GRAY2RGB)
+
                 results = reader.readtext(np_image)
                 results = [r for r in results if r[2] >= CFG.OCR_MIN_CONF]
                 rows.extend([[filename, f"Page {page_num}", text, prob, bbox]
@@ -325,6 +389,17 @@ def process_excel(filepath: str, filename: str, folder: str) -> List[list]:
                             img_bytes = img._data()
                             pil_img = PILImage.open(io.BytesIO(img_bytes))
                             np_img = np.array(pil_img)
+
+                            gray = cv2.cvtColor(np_img, cv2.COLOR_RGB2GRAY)
+                            gray = cv2.fastNlMeansDenoising(gray, h=10)
+                            th = cv2.adaptiveThreshold(
+                                gray, 255,
+                                cv2.ADAPTIVE_THRESH_MEAN_C,
+                                cv2.THRESH_BINARY,
+                                31, 10
+                            )
+                            np_img = cv2.cvtColor(th, cv2.COLOR_GRAY2RGB)
+
                             results = reader.readtext(np_img)
                             results = [r for r in results if r[2] >= CFG.OCR_MIN_CONF]
                             rows.extend([[filename, f"{ws.title} - Embedded Image {idx}", text, prob, bbox]
@@ -366,7 +441,7 @@ def find_combinations(numbers: List[float], target: float,
     return [results[0]]  # Return best match
 
 # -------------------------------
-# ======= ANNOTATION (UPDATED) =======
+# ======= ANNOTATION (NAVY BLUE) =======
 # -------------------------------
 def annotate_image(
     image_path: str,
@@ -376,7 +451,8 @@ def annotate_image(
     file_name: str
 ):
     """
-    Annotate image using ONLY the item labels (1, 2, 3, 1A, 1B...).
+    Annotate image using ONLY the item labels (1, 2, 3, 1A, 1B...),
+    in a consistent deep navy blue color.
     matched_ocr_label_map: {ocr_row_index in all_results -> label string}
     """
     img = cv2.imread(image_path)
@@ -385,6 +461,9 @@ def annotate_image(
 
     any_drawn = False
 
+    # Deep navy blue (BGR)
+    color = (128, 0, 0)
+
     for ocr_idx, label in matched_ocr_label_map.items():
         if ocr_idx >= len(ocr_results):
             continue
@@ -392,14 +471,6 @@ def annotate_image(
         filename, page, text, prob, bbox = ocr_results[ocr_idx]
         if filename != file_name:
             continue
-
-        # Choose color based on OCR confidence
-        if prob > 0.8:
-            color = (0, 255, 0)  # Green - high confidence
-        elif prob > 0.5:
-            color = (0, 255, 255)  # Yellow - medium confidence
-        else:
-            color = (0, 0, 255)  # Red - low confidence
 
         pts = poly_to_int_pts(bbox)
         cv2.polylines(img, [pts], isClosed=True, color=color, thickness=2)
@@ -583,10 +654,11 @@ def process_project(project_path: str, project_name: str):
                     
                     # Find first unmatched OCR row with this amount
                     for ocr_idx, ocr_row in combined.iterrows():
-                        if (pd.isna(ocr_row.get("Original Index")) and 
-                            ocr_idx not in matched_combined_indices and
-                            abs((ocr_row.get("Amount") or 0) - val) < 0.01):
-                            
+                        if (
+                            pd.isna(ocr_row.get("Original Index"))
+                            and ocr_idx not in matched_combined_indices
+                            and abs((ocr_row.get("Amount") or 0) - val) < 0.01
+                        ):
                             matched_combined_indices.add(ocr_idx)
                             
                             ocr_index = ocr_row.get("OCR Index")
@@ -722,5 +794,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
