@@ -19,7 +19,7 @@ from pathlib import Path
 # -------------------------------
 @dataclass
 class Config:
-    BASE_FOLDER: str = r"C:\Users\tim.ng\Desktop\AE"
+    BASE_FOLDER: str = r"C:\Users\YOUR_PATH"
     MASTER_KEYWORDS: Tuple[str, ...] = ("exp", "expense", "report")
     IMAGE_EXTS: Tuple[str, ...] = (".png", ".jpg", ".jpeg")
     EXCEL_EXTS: Tuple[str, ...] = (".xlsx", ".xlsm")
